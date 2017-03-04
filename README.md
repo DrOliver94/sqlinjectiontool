@@ -1,2 +1,2 @@
 # sqlinjectiontool
-Simple SQL blind injection tool in Python
+(Very) simple SQL blind injection tool in Python
